@@ -8,7 +8,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ---- In-memory "database" (demo only, resets on restart) ----
 const transactions = {}; // txnId -> { amount, vehicleNumber, ownerName, status, createdAt }
-let walletBalance = 5000; // NPR demo wallet balance, shared across the app
+let walletBalance = 5000; // NPR demo payer wallet balance
+let merchantBalance = 0; // NPR demo SeemaNet/border-office receiving account balance
 
 // Create a new payment request (called from the border-crossing form page)
 app.post('/api/create-transaction', (req, res) => {
@@ -46,16 +47,22 @@ app.post('/api/pay/:id', (req, res) => {
   }
 
   walletBalance -= txn.amount;
+  merchantBalance += txn.amount;
   txn.status = 'paid';
   txn.paidAt = Date.now();
-  res.json({ ok: true, walletBalance });
+  res.json({ ok: true, walletBalance, merchantBalance });
 });
 
 // Poll status (called from the form page while waiting for the phone to pay)
 app.get('/api/status/:id', (req, res) => {
   const txn = transactions[req.params.id];
   if (!txn) return res.status(404).json({ error: 'Transaction not found' });
-  res.json({ status: txn.status });
+  res.json({ status: txn.status, merchantBalance });
+});
+
+// Fetch just the merchant/border-office account balance (for display on the form page)
+app.get('/api/merchant-balance', (req, res) => {
+  res.json({ merchantBalance });
 });
 
 const PORT = process.env.PORT || 3000;

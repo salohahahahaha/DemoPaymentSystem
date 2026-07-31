@@ -100,6 +100,8 @@
     <h1>SeemaNet · Vehicle Entry Fee</h1>
     <div class="subtitle">Fill in details, then let the owner scan the QR from their phone to pay.</div>
 
+    <div class="amount-tag" id="merchantBalanceTag" style="background:#ecfdf5;color:#065f46;">Border Office Account: Rs. --</div>
+
     <form id="entryForm">
       <label>Vehicle Number</label>
       <input type="text" id="vehicleNumber" placeholder="e.g. UP32 AB 1234" required />
@@ -123,6 +125,13 @@
 
 <script>
   let pollTimer = null;
+
+  async function refreshMerchantBalance() {
+    const res = await fetch('/api/merchant-balance');
+    const data = await res.json();
+    document.getElementById('merchantBalanceTag').textContent = `Border Office Account: Rs. ${data.merchantBalance}`;
+  }
+  refreshMerchantBalance();
 
   document.getElementById('entryForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -158,6 +167,7 @@
       if (sdata.status === 'paid') {
         statusBox.textContent = '✅ Payment Received';
         statusBox.className = 'status paid';
+        document.getElementById('merchantBalanceTag').textContent = `Border Office Account: Rs. ${sdata.merchantBalance}`;
         clearInterval(pollTimer);
       }
     }, 2000);
