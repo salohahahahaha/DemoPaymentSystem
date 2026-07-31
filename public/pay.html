@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>SeemaNet Pay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f4f6f8;
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .phone-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 28px 24px;
+    max-width: 380px;
+    width: 100%;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+  }
+  .brand {
+    text-align: center;
+    font-weight: 800;
+    font-size: 18px;
+    color: #14213d;
+    margin-bottom: 4px;
+  }
+  .brand span { color: #2563eb; }
+  .sub { text-align: center; color: #9ca3af; font-size: 12px; margin-bottom: 20px; }
+  .wallet {
+    background: linear-gradient(135deg,#2563eb,#1e3a8a);
+    color: white;
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+  }
+  .wallet .label { font-size: 12px; opacity: 0.8; }
+  .wallet .balance { font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+  }
+  .detail-row span:first-child { color: #6b7280; }
+  .detail-row span:last-child { font-weight: 600; color: #111827; }
+  .amount-due {
+    text-align: center;
+    margin: 20px 0;
+  }
+  .amount-due .label { font-size: 12px; color: #9ca3af; }
+  .amount-due .value { font-size: 32px; font-weight: 800; color: #14213d; }
+  button {
+    width: 100%;
+    padding: 14px;
+    background: #14213d;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button:disabled { background: #9ca3af; cursor: not-allowed; }
+  .msg { text-align: center; margin-top: 16px; font-weight: 600; font-size: 14px; }
+  .msg.ok { color: #059669; }
+  .msg.err { color: #dc2626; }
+  .loading { text-align: center; color: #6b7280; padding: 40px 0; }
+</style>
+</head>
+<body>
+  <div class="phone-card" id="app">
+    <div class="loading">Loading payment details...</div>
+  </div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const txnId = params.get('txn');
+  const app = document.getElementById('app');
+
+  async function load() {
+    if (!txnId) {
+      app.innerHTML = '<div class="loading">Invalid or missing payment link.</div>';
+      return;
+    }
+    const res = await fetch(`/api/transaction/${txnId}`);
+    const txn = await res.json();
+    if (!res.ok) {
+      app.innerHTML = `<div class="loading">${txn.error || 'Transaction not found'}</div>`;
+      return;
+    }
+    render(txn);
+  }
+
+  function render(txn) {
+    const paid = txn.status === 'paid';
+    app.innerHTML = `
+      <div class="brand">Seema<span>Net</span> Pay</div>
+      <div class="sub">Demo wallet payment</div>
+      <div class="wallet">
+        <div class="label">Wallet Balance</div>
+        <div class="balance">Rs. ${txn.walletBalance}</div>
+      </div>
+      <div class="detail-row"><span>Vehicle</span><span>${txn.vehicleNumber}</span></div>
+      <div class="detail-row"><span>Owner</span><span>${txn.ownerName}</span></div>
+      <div class="detail-row"><span>Purpose</span><span>Border Entry Fee</span></div>
+      <div class="amount-due">
+        <div class="label">Amount Due</div>
+        <div class="value">Rs. ${txn.amount}</div>
+      </div>
+      <button id="payBtn" ${paid ? 'disabled' : ''}>${paid ? 'Already Paid' : 'Confirm & Pay'}</button>
+      <div id="msg"></div>
+    `;
+    if (!paid) {
+      document.getElementById('payBtn').addEventListener('click', () => pay(txn));
+    }
+  }
+
+  async function pay(txn) {
+    const btn = document.getElementById('payBtn');
+    btn.disabled = true;
+    btn.textContent = 'Processing...';
+    const res = await fetch(`/api/pay/${txnId}`, { method: 'POST' });
+    const data = await res.json();
+    const msg = document.getElementById('msg');
+    if (res.ok) {
+      btn.textContent = 'Paid ✅';
+      msg.innerHTML = `<div class="msg ok">Payment successful. New balance: Rs. ${data.walletBalance}</div>`;
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Confirm & Pay';
+      msg.innerHTML = `<div class="msg err">${data.error}</div>`;
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

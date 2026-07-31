@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>SeemaNet - Vehicle Entry Form</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 440px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+    color: #14213d;
+  }
+  .subtitle {
+    color: #6b7280;
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 6px;
+    margin-top: 14px;
+  }
+  input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 15px;
+  }
+  button {
+    width: 100%;
+    margin-top: 22px;
+    padding: 12px;
+    background: #14213d;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: #0f1b30; }
+  #result {
+    margin-top: 24px;
+    text-align: center;
+    display: none;
+  }
+  #qrcode {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0;
+  }
+  .amount-tag {
+    display: inline-block;
+    background: #eef2ff;
+    color: #14213d;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+  .status {
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 10px;
+  }
+  .status.pending { background: #fef3c7; color: #92400e; }
+  .status.paid { background: #d1fae5; color: #065f46; }
+  .hint { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>SeemaNet · Vehicle Entry Fee</h1>
+    <div class="subtitle">Fill in details, then let the owner scan the QR from their phone to pay.</div>
+
+    <form id="entryForm">
+      <label>Vehicle Number</label>
+      <input type="text" id="vehicleNumber" placeholder="e.g. UP32 AB 1234" required />
+
+      <label>Owner Name</label>
+      <input type="text" id="ownerName" placeholder="e.g. Ramesh Sharma" required />
+
+      <label>Entry Fee (NPR)</label>
+      <input type="number" id="amount" value="500" min="1" required />
+
+      <button type="submit">Generate Payment QR</button>
+    </form>
+
+    <div id="result">
+      <div class="amount-tag" id="amountTag"></div>
+      <div id="qrcode"></div>
+      <div class="hint">Scan with your phone camera to open the payment page</div>
+      <div class="status pending" id="statusBox">Waiting for payment...</div>
+    </div>
+  </div>
+
+<script>
+  let pollTimer = null;
+
+  document.getElementById('entryForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const vehicleNumber = document.getElementById('vehicleNumber').value;
+    const ownerName = document.getElementById('ownerName').value;
+    const amount = document.getElementById('amount').value;
+
+    const res = await fetch('/api/create-transaction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, vehicleNumber, ownerName })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Failed to create transaction'); return; }
+
+    document.getElementById('result').style.display = 'block';
+    document.getElementById('amountTag').textContent = `Rs. ${amount} due`;
+    document.getElementById('qrcode').innerHTML = '';
+    new QRCode(document.getElementById('qrcode'), {
+      text: data.payUrl,
+      width: 200,
+      height: 200
+    });
+
+    const statusBox = document.getElementById('statusBox');
+    statusBox.textContent = 'Waiting for payment...';
+    statusBox.className = 'status pending';
+
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      const sres = await fetch(`/api/status/${data.id}`);
+      const sdata = await sres.json();
+      if (sdata.status === 'paid') {
+        statusBox.textContent = '✅ Payment Received';
+        statusBox.className = 'status paid';
+        clearInterval(pollTimer);
+      }
+    }, 2000);
+  });
+</script>
+</body>
+</html>
