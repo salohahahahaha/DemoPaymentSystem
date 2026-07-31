@@ -1,12 +1,8 @@
 {
   "name": "seemanet-payment-demo",
   "version": "1.0.0",
-  "description": "Demo QR scan-to-pay flow for SeemaNet border crossing fees",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
+  "description": "Demo QR scan-to-pay flow for SeemaNet border crossing fees (Vercel version)",
   "dependencies": {
-    "express": "^4.19.2"
+    "@vercel/kv": "^2.0.0"
   }
 }

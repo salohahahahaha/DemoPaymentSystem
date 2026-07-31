@@ -1,49 +1,39 @@
-# SeemaNet Payment Demo
+# SeemaNet Payment Demo (Vercel version)
 
-A demo "scan QR to pay" flow for the vehicle entry fee, like eSewa/Fonepay.
+Same "scan QR to pay" flow as before, restructured for Vercel:
+- `/public/index.html` — officer/border form, generates QR (payer/receiver roles explained below)
+- `/public/pay.html` — opens when the QR is scanned, shows demo payer wallet
+- `/api/*.js` — serverless functions (replacing the old `server.js` Express server)
+- Data (transactions, payer wallet, merchant/border-office balance) is stored in **Vercel KV**, not in-memory — this is required because serverless functions don't share memory between requests.
 
-## How it works
-1. `index.html` — the border-crossing form. Officer/owner fills vehicle number, name, fee amount, hits "Generate Payment QR".
-2. A QR code appears, encoding a real link to `pay.html?txn=<id>`.
-3. Owner scans it with their **actual phone camera** (from home, or anywhere) — it opens `pay.html` in their phone's browser.
-4. `pay.html` shows a demo wallet (starts at Rs. 5000) and the amount due. Tapping "Confirm & Pay" deducts the amount.
-5. The form page polls every 2 seconds and shows "✅ Payment Received" once paid.
+## Why this changed from the Express version
+Vercel functions are stateless: each request can run on a different instance with a blank memory. The old `server.js` kept balances as plain JS variables, which worked fine on a persistent server (Render/Railway) but breaks silently on Vercel — a transaction created by one function call might not exist when the next call checks it. Vercel KV (a hosted Redis) fixes this by giving all functions a shared store.
 
-Balances and transactions live in server memory — fine for a demo, resets if the server restarts.
+## Setup steps
 
-## Run locally
+### 1. Push this project to GitHub (same as before)
 ```
-npm install
-npm start
+git init
+git add .
+git commit -m "Vercel version with KV"
+git branch -M main
+git remote add origin <your-repo-url>
+git push -u origin main
 ```
-Visit http://localhost:3000
 
-## Deploy for real (so a phone can actually scan it)
-You need a real public URL — pick one of these free options:
+### 2. Import into Vercel
+- https://vercel.com → New Project → import your GitHub repo → Deploy
+- It'll auto-detect the `/api` functions and `/public` static files, no config needed.
 
-### Option A: Render.com (recommended, easiest)
-1. Push this folder to a GitHub repo.
-2. Go to https://render.com → New → Web Service → connect your repo.
-3. Build command: `npm install`
-4. Start command: `npm start`
-5. Deploy. You'll get a URL like `https://seemanet-demo.onrender.com`.
+### 3. Attach a KV database (one-time)
+- In your Vercel project → **Storage** tab → **Create Database** → choose **KV**
+- Name it anything, pick a region close to your users
+- Click **Connect** to your project — Vercel automatically injects the required environment variables (`KV_REST_API_URL`, `KV_REST_API_TOKEN`, etc.), you don't need to copy anything manually
+- Redeploy the project once (Deployments tab → ⋯ → Redeploy) so the new env vars take effect
 
-### Option B: Railway.app
-1. https://railway.app → New Project → Deploy from GitHub repo.
-2. It auto-detects Node and runs `npm start`.
-3. Generate a public domain from the service settings.
+### 4. Test it
+Open your Vercel URL (e.g. `https://seemanet-payment-demo.vercel.app`), fill the form, generate the QR, scan it with your phone, and confirm payment. The payer wallet starts at Rs. 5000 and the Border Office account starts at Rs. 0 — both live in KV now, so they persist correctly across the officer page and the phone page.
 
-### Option C: Quick temporary tunnel (no deploy, for a live demo only)
-If you just want it working for the next hour (e.g. during the hackathon judging):
-```
-npm start
-```
-then in another terminal:
-```
-npx localtunnel --port 3000
-```
-It gives you a temporary public URL (e.g. `https://random-name.loca.lt`) that forwards to your laptop. Good enough to scan live, but it dies when you close the terminal or your laptop sleeps — Render/Railway is safer for the actual event.
-
-## Notes for the real SeemaNet integration
-- Replace the in-memory `transactions`/`walletBalance` with your actual DB and real wallet/gateway logic (eSewa, Fonepay, Khalti APIs) later.
-- The QR just needs to encode a URL — same idea works with any real payment gateway once you have API credentials.
+## Notes
+- `server.js` from the earlier Express version is no longer used on Vercel — safe to delete, or keep for local testing without Vercel.
+- Local testing on Vercel's own setup requires the Vercel CLI (`npm i -g vercel`, then `vercel dev`), which also needs the KV env vars — easiest to just test on the deployed URL.
